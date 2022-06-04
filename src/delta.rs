@@ -12,7 +12,7 @@ pub enum Command {
     CopyBlock { index: usize },
 }
 
-pub fn diff<S, D, const BLOCK_SIZE: u16>(signatures: S, data: D) -> io::Result<Vec<Command>>
+pub fn delta<S, D, const BLOCK_SIZE: u16>(signatures: S, data: D) -> io::Result<Vec<Command>>
 where
     S: IntoIterator<Item = BlockSignature>,
     D: Read,
