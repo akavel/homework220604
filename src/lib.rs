@@ -27,7 +27,7 @@ where
     let mut commands = vec![];
     let mut data_bytes = data.bytes();
     let mut buf = vec![];
-    let mut weak_sum = None;
+    let mut weak_sum = WeakSum::default();
     loop {
         let byte = match data_bytes.next() {
             Some(Ok(byte)) => byte,
@@ -44,12 +44,12 @@ where
         if buf_len < BLOCK_SIZE as usize {
             continue;
         } else if buf_len == BLOCK_SIZE as usize {
-            weak_sum = Some(WeakSum::from(&*buf));
+            weak_sum = WeakSum::from(&*buf);
         } else {
             let old_byte = buf[buf_len - BLOCK_SIZE as usize - 1];
-            weak_sum.unwrap().update(BLOCK_SIZE, old_byte, byte);
+            weak_sum.update(BLOCK_SIZE, old_byte, byte);
         }
-        if let Some(block_info) = block_map.get(&weak_sum.unwrap()) {
+        if let Some(block_info) = block_map.get(&weak_sum) {
             let block_begin = buf.len() - BLOCK_SIZE as usize;
             let digest = Md4::digest(&buf[block_begin..]);
             if digest != block_info.digest {
