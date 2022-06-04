@@ -36,23 +36,23 @@ where
         };
         // TODO[LATER]: enum for func state
         buf.push(byte);
-        const BLOCK_SIZE_: usize = BLOCK_SIZE as usize;
-        const BLOCK_SIZE_MINUS_1: usize = BLOCK_SIZE_ - 1;
+        const BLOCK_USIZE: usize = BLOCK_SIZE as usize;
+        const BLOCK_USIZE_MINUS_1: usize = BLOCK_USIZE - 1;
         match buf.len() {
-            0..=BLOCK_SIZE_MINUS_1 => continue,
-            BLOCK_SIZE_ => {
+            0..=BLOCK_USIZE_MINUS_1 => continue,
+            BLOCK_USIZE => {
                 weak_sum = Some(WeakSum::from(&*buf));
             }
             n @ _ => {
                 weak_sum
                     .unwrap()
-                    .update(BLOCK_SIZE, buf[n - BLOCK_SIZE_ - 1], byte);
+                    .update(BLOCK_SIZE, buf[n - BLOCK_USIZE - 1], byte);
             }
         }
         if let Some(block_info) = block_map.get(&weak_sum.unwrap()) {
-            let block_begin = buf.len() - BLOCK_SIZE_;
-            let strong_sum = Md4::digest(&buf[block_begin..]);
-            if strong_sum != block_info.signature.strong {
+            let block_begin = buf.len() - BLOCK_USIZE;
+            let digest = Md4::digest(&buf[block_begin..]);
+            if digest != block_info.digest {
                 continue;
             }
             buf.truncate(block_begin);
@@ -72,13 +72,19 @@ type BlockMap = HashMap<WeakSum, BlockInfo>;
 
 struct BlockInfo {
     index: usize,
-    signature: BlockSignature,
+    digest: Md4Digest,
+}
+
+impl BlockInfo {
+    fn new(index: usize, digest: Md4Digest) -> Self {
+        Self { index, digest }
+    }
 }
 
 fn block_map_from_signatures(signatures: impl Iterator<Item = BlockSignature>) -> BlockMap {
     signatures
         .enumerate()
-        .map(|(index, signature)| (signature.weak, BlockInfo { signature, index }))
+        .map(|(index, signature)| (signature.weak, BlockInfo::new(index, signature.strong)))
         .collect()
 }
 
