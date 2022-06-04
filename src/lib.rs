@@ -1,4 +1,5 @@
 use md4::{Digest, Md4};
+use std::collections::HashMap;
 use std::io::{self, Read};
 use std::num::Wrapping;
 use std::ops::Deref;
@@ -10,6 +11,19 @@ pub fn signature(r: impl Read) -> impl Iterator<Item = io::Result<BlockSignature
         .map(|result| result.map(|block| BlockSignature::from(block.deref())))
 }
 
+pub fn diff<S, D>(signature: S, data: D) -> Result<Vec<Command>>
+where S: IntoIterator<Item = BlockSignature>,
+      D: Read,
+{
+    let blocks = HashMap::from_iter(signature.enumerate().map(|(i, signature)| (signature.weak, DiffBlockInfo { signature, block_index: i })));
+}
+
+struct DiffBlockInfo {
+    block_index: usize,
+    signature: BlockSignature,
+}
+
+// TODO[LATER]: move to submodule
 pub struct Chunker<R: Read> {
     chunk_size: u16,
     source: R,
@@ -32,6 +46,11 @@ impl<R: Read> Iterator for Chunker<R> {
             Ok(_) => None,
         }
     }
+}
+
+pub enum Command {
+    Raw { data: Vec<u8> },
+    CopyBlock { index: usize },
 }
 
 #[derive(Debug)]
