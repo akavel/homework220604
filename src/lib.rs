@@ -13,22 +13,13 @@ pub fn signature(r: impl Read) -> impl Iterator<Item = io::Result<BlockSignature
         .map(|result| result.map(|block| BlockSignature::from(block.deref())))
 }
 
-pub fn diff<S, D>(signature: S, data: D) -> io::Result<Vec<Command>>
+pub fn diff<S, D>(signatures: S, data: D) -> io::Result<Vec<Command>>
 where
     S: Iterator<Item = BlockSignature>,
     D: Read,
 {
     use Command::*;
-    type BlockInfoMap = HashMap<WeakSum, DiffBlockInfo>;
-    let blocks = BlockInfoMap::from_iter(signature.enumerate().map(|(i, signature)| {
-        (
-            signature.weak,
-            DiffBlockInfo {
-                signature,
-                block_index: i,
-            },
-        )
-    }));
+    let block_map = block_map_from_signatures(signatures);
     let mut commands = vec![];
     let mut data_bytes = data.bytes();
     let mut buf = vec![];
@@ -58,7 +49,7 @@ where
                     .update(BLOCK_SIZE, buf[n - BLOCK_SIZE_ - 1], byte);
             }
         }
-        if let Some(block_info) = blocks.get(&weak_sum.unwrap()) {
+        if let Some(block_info) = block_map.get(&weak_sum.unwrap()) {
             let block_begin = buf.len() - BLOCK_SIZE_;
             let strong_sum = Md4::digest(&buf[block_begin..]);
             if strong_sum != block_info.signature.strong {
@@ -71,15 +62,24 @@ where
                 });
             }
             commands.push(CopyBlock {
-                index: block_info.block_index,
+                index: block_info.index,
             });
         }
     }
 }
 
-struct DiffBlockInfo {
-    block_index: usize,
+type BlockMap = HashMap<WeakSum, BlockInfo>;
+
+struct BlockInfo {
+    index: usize,
     signature: BlockSignature,
+}
+
+fn block_map_from_signatures(signatures: impl Iterator<Item = BlockSignature>) -> BlockMap {
+    signatures
+        .enumerate()
+        .map(|(index, signature)| (signature.weak, BlockInfo { signature, index }))
+        .collect()
 }
 
 // TODO[LATER]: move to submodule
