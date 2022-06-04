@@ -4,18 +4,77 @@ use std::io::{self, Read};
 use std::num::Wrapping;
 use std::ops::Deref;
 
+// TODO[LATER]: make it a parameter
+const BLOCK_SIZE: u16 = 1024;
+
 pub fn signature(r: impl Read) -> impl Iterator<Item = io::Result<BlockSignature>> {
     // TODO: do we have to calc signature for the last smaller block too? sounds risky & tricky & not worth it
-    const BLOCK_SIZE: u16 = 1024;
     Chunker::new(BLOCK_SIZE, r)
         .map(|result| result.map(|block| BlockSignature::from(block.deref())))
 }
 
-pub fn diff<S, D>(signature: S, data: D) -> Result<Vec<Command>>
-where S: IntoIterator<Item = BlockSignature>,
-      D: Read,
+pub fn diff<S, D>(signature: S, data: D) -> io::Result<Vec<Command>>
+where
+    S: Iterator<Item = BlockSignature>,
+    D: Read,
 {
-    let blocks = HashMap::from_iter(signature.enumerate().map(|(i, signature)| (signature.weak, DiffBlockInfo { signature, block_index: i })));
+    use Command::*;
+    type BlockInfoMap = HashMap<WeakSum, DiffBlockInfo>;
+    let blocks = BlockInfoMap::from_iter(signature.enumerate().map(|(i, signature)| {
+        (
+            signature.weak,
+            DiffBlockInfo {
+                signature,
+                block_index: i,
+            },
+        )
+    }));
+    let mut commands = vec![];
+    let mut data_bytes = data.bytes();
+    let mut buf = vec![];
+    let mut weak_sum = None;
+    loop {
+        let byte = match data_bytes.next() {
+            Some(Ok(byte)) => byte,
+            Some(Err(err)) => return Err(err),
+            None => {
+                // EOF, per io::Read::bytes() docs.
+                commands.push(Raw { data: buf });
+                return Ok(commands);
+            }
+        };
+        // TODO[LATER]: enum for func state
+        buf.push(byte);
+        const BLOCK_SIZE_: usize = BLOCK_SIZE as usize;
+        const BLOCK_SIZE_MINUS_1: usize = BLOCK_SIZE_ - 1;
+        match buf.len() {
+            0..=BLOCK_SIZE_MINUS_1 => continue,
+            BLOCK_SIZE_ => {
+                weak_sum = Some(WeakSum::from(&*buf));
+            }
+            n @ _ => {
+                weak_sum
+                    .unwrap()
+                    .update(BLOCK_SIZE, buf[n - BLOCK_SIZE_ - 1], byte);
+            }
+        }
+        if let Some(block_info) = blocks.get(&weak_sum.unwrap()) {
+            let block_begin = buf.len() - BLOCK_SIZE_;
+            let strong_sum = Md4::digest(&buf[block_begin..]);
+            if strong_sum != block_info.signature.strong {
+                continue;
+            }
+            buf.truncate(block_begin);
+            if block_begin > 0 {
+                commands.push(Raw {
+                    data: std::mem::replace(&mut buf, vec![]),
+                });
+            }
+            commands.push(CopyBlock {
+                index: block_info.block_index,
+            });
+        }
+    }
 }
 
 struct DiffBlockInfo {
@@ -72,7 +131,7 @@ impl From<&[u8]> for BlockSignature {
 
 // TODO: verify with rdiff
 // https://rsync.samba.org/tech_report/node3.html
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct WeakSum {
     a: Wrapping<u16>,
     b: Wrapping<u16>,
