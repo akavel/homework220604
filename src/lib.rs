@@ -1,3 +1,8 @@
+//! Implementation of a file diffing algorithm based on a rolling hash. Based on a description of
+//! the rsync algorithm used in the [rdiff](https://linux.die.net/man/1/rdiff) tool.
+//!
+//! See [`signature()`] and [`delta()`] for more details.
+
 mod chunker;
 mod delta;
 mod signature;
