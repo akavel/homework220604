@@ -190,9 +190,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_weak_sum() {
+    fn test_weak_sum_from() {
         assert_eq!(WeakSum::from(&[1][..]).to_u32(), 0x00010001);
         assert_eq!(WeakSum::from(&[1, 2][..]).to_u32(), 0x00040003);
+    }
+
+    #[test]
+    fn test_weak_sum_update() {
+        let mut weak_sum = WeakSum::from(&[1, 2][..]);
+        weak_sum.update(2, 1, 3);
+        assert_eq!(weak_sum.to_u32(), WeakSum::from(&[2, 3][..]).to_u32());
     }
 
     #[test]
