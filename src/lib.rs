@@ -1,22 +1,13 @@
 mod chunker;
+mod signature;
 mod weak_sum;
 
-use chunker::Chunker;
+pub use signature::*;
 use weak_sum::WeakSum;
 
 use md4::{Digest, Md4};
 use std::collections::HashMap;
-use std::fmt;
 use std::io::{self, Read};
-use std::ops::Deref;
-
-pub fn signature<R, const BLOCK_SIZE: u16>(r: R) -> impl Iterator<Item = io::Result<BlockSignature>>
-where
-    R: Read,
-{
-    Chunker::new(BLOCK_SIZE, r)
-        .map(|result| result.map(|block| BlockSignature::from(block.deref())))
-}
 
 pub fn diff<S, D, const BLOCK_SIZE: u16>(signatures: S, data: D) -> io::Result<Vec<Command>>
 where
@@ -92,29 +83,6 @@ fn block_map_from_signatures(signatures: impl Iterator<Item = BlockSignature>) -
 pub enum Command {
     Raw { data: Vec<u8> },
     CopyBlock { index: usize },
-}
-
-pub struct BlockSignature {
-    pub weak: WeakSum,
-    pub strong: Md4Digest,
-}
-
-type Md4Digest = digest::generic_array::GenericArray<u8, digest::typenum::U16>;
-
-impl fmt::Debug for BlockSignature {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let strong_in_hex = base16ct::lower::encode_string(&self.strong);
-        write!(f, "[{} {:?}]", strong_in_hex, self.weak)
-    }
-}
-
-impl From<&[u8]> for BlockSignature {
-    fn from(buf: &[u8]) -> Self {
-        Self {
-            weak: buf.into(),
-            strong: Md4::digest(buf),
-        }
-    }
 }
 
 #[cfg(test)]
