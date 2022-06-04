@@ -1,10 +1,33 @@
+use md4::{Digest, Md4};
 use std::num::Wrapping;
 
-// 1. calc checksum for a slice
+#[derive(Debug)]
+pub struct BlockSignature {
+    pub weak: WeakSum,
+    pub strong: Md4Digest,
+}
 
+type Md4Digest = digest::generic_array::GenericArray<u8, digest::typenum::U16>;
+
+impl From<&[u8]> for BlockSignature {
+    fn from(buf: &[u8]) -> Self {
+        Self {
+            weak: buf.into(),
+            strong: Md4::digest(buf),
+        }
+    }
+}
+
+// // TODO[LATER]: iterator of sized chunks of an io::Read impl
+// pub fn signature(r: impl io::Read) -> io::Result<Vec<SignatureEntry>> {
+// }
+
+// TODO: do we have to calc signature for the last smaller block too? sounds risky & tricky & not worth it
+
+// TODO: verify with rdiff
 // https://rsync.samba.org/tech_report/node3.html
 #[derive(Copy, Clone, Debug)]
-struct WeakSum {
+pub struct WeakSum {
     a: Wrapping<u16>,
     b: Wrapping<u16>,
 }
@@ -39,18 +62,6 @@ impl WeakSum {
     fn to_u32(&self) -> u32 {
         (self.b.0 as u32) << 16 | (self.a.0 as u32)
     }
-}
-
-// fn update_weak_sum(slice_length: u64, old_sum: u32, old_prefix: u8, new_suffix: u8) -> u32 {
-//     let old_a = Wrapping(old_sum as u16);
-//     let old_b = Wrapping((old_sum >> 16) as u16);
-//     let new_a = old_a - old_prefix + new_suffix;
-//     let new_b = old_b - (slice_length) * old_prefix + new_a;
-// }
-
-struct SignatureEntry {
-    pub weak: u32,
-    pub strong: u32,
 }
 
 // u16 << 16 | u16 ---> u32
