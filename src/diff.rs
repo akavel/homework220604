@@ -1,6 +1,6 @@
+use crate::signature::BlockSignature;
+use crate::signature::Md4Digest;
 use crate::weak_sum::WeakSum;
-use crate::BlockSignature;
-use crate::Md4Digest;
 
 use md4::{Digest, Md4};
 use std::collections::HashMap;
