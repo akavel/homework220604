@@ -8,10 +8,15 @@ use std::io::{self, Read};
 
 #[derive(PartialEq, Debug)]
 pub enum Command {
+    /// A command instructing to append raw `data` bytes at the end of a file.
     Raw { data: Vec<u8> },
+    /// A command instructing to append the contents of an `index`th block of the "reference" file
+    /// (passed to [`crate::signature()`]) at the end of a file.
     CopyBlock { index: usize },
 }
 
+/// Calculates a set of [`Command`]s allowing to reconstruct `data` from a file corresponding to
+/// `signatures`. (See [`crate::signature()`] for details about `signatures`.)
 pub fn delta<S, D, const BLOCK_SIZE: u16>(signatures: S, data: D) -> io::Result<Vec<Command>>
 where
     S: IntoIterator<Item = BlockSignature>,

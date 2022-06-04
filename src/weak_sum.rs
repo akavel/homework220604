@@ -1,6 +1,8 @@
 use std::fmt;
 use std::num::Wrapping;
 
+/// A rolling checksum as described in [the rsync algorithm
+/// documentation](https://rsync.samba.org/tech_report/node3.html).
 #[derive(Copy, Clone, Default, Eq, PartialEq, Hash)]
 pub struct WeakSum {
     a: Wrapping<u16>,
@@ -33,7 +35,12 @@ impl From<&WeakSum> for u32 {
 }
 
 impl WeakSum {
-    // NOTE: slice_length: u16
+    /// Calculate a new rolling checksum based on a previously calculated checksum for a slice of
+    /// length `slice_length`. The new checksum will be for a slice of same length with
+    /// `old_prefix` byte removed from the beginning of the old slice and `new_slice` byte
+    /// appended at its end.
+    ///
+    /// The algorithm treats slice lengths modulo 2¹⁶.
     pub fn update(&mut self, slice_length: u16, old_prefix: u8, new_suffix: u8) {
         self.a += new_suffix as u16;
         self.a -= old_prefix as u16;

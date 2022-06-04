@@ -6,6 +6,8 @@ use std::fmt;
 use std::io::{self, Read};
 use std::ops::Deref;
 
+/// Splits data read from `r` into consecutive blocks of `BLOCK_SIZE` bytes. Calculates a
+/// [`BlockSignature`] for each of the blocks. Any trailing block of smaller size is ignored.
 pub fn signature<R, const BLOCK_SIZE: u16>(r: R) -> impl Iterator<Item = io::Result<BlockSignature>>
 where
     R: Read,
@@ -19,6 +21,7 @@ pub struct BlockSignature {
     pub strong: Md4Digest,
 }
 
+/// An [`md4::Md4`] hash digest.
 pub type Md4Digest = digest::generic_array::GenericArray<u8, digest::typenum::U16>;
 
 impl fmt::Debug for BlockSignature {

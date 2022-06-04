@@ -4,9 +4,9 @@
 //! See [`signature()`] and [`delta()`] for more details.
 
 mod chunker;
-mod delta;
-mod signature;
-mod weak_sum;
+pub mod delta;
+pub mod signature;
+pub mod weak_sum;
 
 pub use delta::delta;
 pub use signature::signature;
