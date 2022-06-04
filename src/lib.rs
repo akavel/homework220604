@@ -5,14 +5,10 @@ use std::io::{self, Read};
 use std::num::Wrapping;
 use std::ops::Deref;
 
-// TODO[LATER]: make it a parameter
-const DEFAULT_BLOCK_SIZE: u16 = 1024;
-
 pub fn signature<R, const BLOCK_SIZE: u16>(r: R) -> impl Iterator<Item = io::Result<BlockSignature>>
 where
     R: Read,
 {
-    // TODO: do we have to calc signature for the last smaller block too? sounds risky & tricky & not worth it
     Chunker::new(BLOCK_SIZE, r)
         .map(|result| result.map(|block| BlockSignature::from(block.deref())))
 }
@@ -38,7 +34,6 @@ where
                 return Ok(commands);
             }
         };
-        // TODO[LATER]: enum for func state
         buf.push(byte);
         let buf_len = buf.len();
         if buf_len < BLOCK_SIZE as usize {
@@ -187,15 +182,6 @@ impl WeakSum {
     }
 }
 
-// // TODO: what type to return?
-// // TODO: doc
-// pub fn signature(data: impl io::Read) -> Vec<SignatureEntry> {
-//     vec![]
-// }
-
-// fn read_n<R>(reader: R, bytes_to_read: u64) ->
-// https://stackoverflow.com/a/30413877/98528
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -260,15 +246,4 @@ mod tests {
             ]
         );
     }
-
-    /*
-    #[test]
-    fn simple_signature() {
-        let sig = signature("abc");
-        assert_eq!(sig[0].weak, 123);
-        assert_eq!(sig[0].strong, 123);
-    }
-    */
-
-    // TODO: more tests
 }
