@@ -1,3 +1,6 @@
+mod chunker;
+
+use chunker::Chunker;
 use md4::{Digest, Md4};
 use std::collections::HashMap;
 use std::fmt;
@@ -81,31 +84,6 @@ fn block_map_from_signatures(signatures: impl Iterator<Item = BlockSignature>) -
         .enumerate()
         .map(|(index, signature)| (signature.weak, BlockInfo::new(index, signature.strong)))
         .collect()
-}
-
-// TODO[LATER]: move to submodule
-pub struct Chunker<R: Read> {
-    chunk_size: u16,
-    source: R,
-}
-
-impl<R: Read> Chunker<R> {
-    fn new(chunk_size: u16, source: R) -> Self {
-        Self { chunk_size, source }
-    }
-}
-
-impl<R: Read> Iterator for Chunker<R> {
-    type Item = io::Result<Vec<u8>>;
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut buf = vec![];
-        let mut limited_reader = self.source.by_ref().take(self.chunk_size as u64);
-        match limited_reader.read_to_end(&mut buf) {
-            Err(err) => Some(Err(err)),
-            Ok(n) if n == self.chunk_size as usize => Some(Ok(buf)),
-            Ok(_) => None,
-        }
-    }
 }
 
 #[derive(PartialEq, Debug)]
@@ -197,21 +175,6 @@ mod tests {
         let mut weak_sum = WeakSum::from(&[1, 2][..]);
         weak_sum.update(2, 1, 3);
         assert_eq!(weak_sum.to_u32(), WeakSum::from(&[2, 3][..]).to_u32());
-    }
-
-    #[test]
-    fn test_chunker() {
-        let source = vec![1, 2, 3];
-
-        let chunks_len_2: Vec<_> = Chunker::new(2, &*source)
-            .map(|result| result.ok())
-            .collect();
-        assert_eq!(chunks_len_2, [Some(vec![1, 2])]);
-
-        let chunks_len_3: Vec<_> = Chunker::new(3, &*source)
-            .map(|result| result.ok())
-            .collect();
-        assert_eq!(chunks_len_3, [Some(vec![1, 2, 3])]);
     }
 
     fn signature_4<R: Read>(r: R) -> impl Iterator<Item = io::Result<BlockSignature>> {
