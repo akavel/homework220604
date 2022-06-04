@@ -1,5 +1,6 @@
 use md4::{Digest, Md4};
 use std::collections::HashMap;
+use std::fmt;
 use std::io::{self, Read};
 use std::num::Wrapping;
 use std::ops::Deref;
@@ -118,13 +119,19 @@ pub enum Command {
     CopyBlock { index: usize },
 }
 
-#[derive(Debug)]
 pub struct BlockSignature {
     pub weak: WeakSum,
     pub strong: Md4Digest,
 }
 
 type Md4Digest = digest::generic_array::GenericArray<u8, digest::typenum::U16>;
+
+impl fmt::Debug for BlockSignature {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let strong_in_hex = base16ct::lower::encode_string(&self.strong);
+        write!(f, "[{} {:?}]", strong_in_hex, self.weak)
+    }
+}
 
 impl From<&[u8]> for BlockSignature {
     fn from(buf: &[u8]) -> Self {
@@ -135,12 +142,16 @@ impl From<&[u8]> for BlockSignature {
     }
 }
 
-// TODO: verify with rdiff
-// https://rsync.samba.org/tech_report/node3.html
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Default, Eq, PartialEq, Hash)]
 pub struct WeakSum {
     a: Wrapping<u16>,
     b: Wrapping<u16>,
+}
+
+impl fmt::Debug for WeakSum {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({}, {})", self.b, self.a)
+    }
 }
 
 impl From<&[u8]> for WeakSum {
