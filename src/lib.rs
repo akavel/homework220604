@@ -165,7 +165,8 @@ impl From<&WeakSum> for u32 {
 impl WeakSum {
     // NOTE: slice_length: u16
     fn update(&mut self, slice_length: u16, old_prefix: u8, new_suffix: u8) {
-        self.a += new_suffix as u16 - old_prefix as u16;
+        self.a += new_suffix as u16;
+        self.a -= old_prefix as u16;
         self.b += self.a;
         self.b -= slice_length * old_prefix as u16;
     }
