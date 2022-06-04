@@ -18,7 +18,7 @@ mod tests {
 
     fn diff_4<S, D>(signatures: S, data: D) -> io::Result<Vec<Command>>
     where
-        S: Iterator<Item = BlockSignature>,
+        S: IntoIterator<Item = BlockSignature>,
         D: Read,
     {
         diff::<S, D, 4>(signatures, data)
@@ -32,7 +32,7 @@ mod tests {
         let signature: Vec<_> = signature_4(&*old_file)
             .map(|result| result.unwrap())
             .collect();
-        let diff = diff_4(signature.into_iter(), &*new_file).unwrap();
+        let diff = diff_4(signature, &*new_file).unwrap();
         assert_eq!(
             diff,
             [

@@ -14,11 +14,11 @@ pub enum Command {
 
 pub fn diff<S, D, const BLOCK_SIZE: u16>(signatures: S, data: D) -> io::Result<Vec<Command>>
 where
-    S: Iterator<Item = BlockSignature>,
+    S: IntoIterator<Item = BlockSignature>,
     D: Read,
 {
     use Command::*;
-    let block_map = block_map_from_signatures(signatures);
+    let block_map = block_map_from_signatures(signatures.into_iter());
     let mut commands = vec![];
     let mut data_bytes = data.bytes();
     let mut buf = vec![];
