@@ -7,9 +7,10 @@ use std::ops::Deref;
 // TODO[LATER]: make it a parameter
 const DEFAULT_BLOCK_SIZE: u16 = 1024;
 
-pub fn signature<const BLOCK_SIZE: u16>(
-    r: impl Read,
-) -> impl Iterator<Item = io::Result<BlockSignature>> {
+pub fn signature<R, const BLOCK_SIZE: u16>(r: R) -> impl Iterator<Item = io::Result<BlockSignature>>
+where
+    R: Read,
+{
     // TODO: do we have to calc signature for the last smaller block too? sounds risky & tricky & not worth it
     Chunker::new(BLOCK_SIZE, r)
         .map(|result| result.map(|block| BlockSignature::from(block.deref())))
@@ -111,6 +112,7 @@ impl<R: Read> Iterator for Chunker<R> {
     }
 }
 
+#[derive(PartialEq, Debug)]
 pub enum Command {
     Raw { data: Vec<u8> },
     CopyBlock { index: usize },
@@ -205,6 +207,39 @@ mod tests {
             .map(|result| result.ok())
             .collect();
         assert_eq!(chunks_len_3, [Some(vec![1, 2, 3])]);
+    }
+
+    fn signature_4<R: Read>(r: R) -> impl Iterator<Item = io::Result<BlockSignature>> {
+        signature::<R, 4>(r)
+    }
+
+    fn diff_4<S, D>(signatures: S, data: D) -> io::Result<Vec<Command>>
+    where
+        S: Iterator<Item = BlockSignature>,
+        D: Read,
+    {
+        diff::<S, D, 4>(signatures, data)
+    }
+
+    #[test]
+    fn test_diff() {
+        use Command::*;
+        let old_file = vec![1, 2, 3, 4, 10, 20, 30, 40];
+        let new_file = vec![0, 1, 10, 20, 30, 40, 99, 1, 2, 3, 4, 55];
+        let signature: Vec<_> = signature_4(&*old_file)
+            .map(|result| result.unwrap())
+            .collect();
+        let diff = diff_4(signature.into_iter(), &*new_file).unwrap();
+        assert_eq!(
+            diff,
+            [
+                Raw { data: vec![0, 1] },
+                CopyBlock { index: 1 },
+                Raw { data: vec![99] },
+                CopyBlock { index: 0 },
+                Raw { data: vec![55] },
+            ]
+        );
     }
 
     /*
