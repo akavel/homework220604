@@ -1,6 +1,14 @@
 use md4::{Digest, Md4};
 use std::io::{self, Read};
 use std::num::Wrapping;
+use std::ops::Deref;
+
+pub fn signature(r: impl Read) -> impl Iterator<Item = io::Result<BlockSignature>> {
+    // TODO: do we have to calc signature for the last smaller block too? sounds risky & tricky & not worth it
+    const BLOCK_SIZE: u16 = 1024;
+    Chunker::new(BLOCK_SIZE, r)
+        .map(|result| result.map(|block| BlockSignature::from(block.deref())))
+}
 
 pub struct Chunker<R: Read> {
     chunk_size: u16,
@@ -18,7 +26,6 @@ impl<R: Read> Iterator for Chunker<R> {
     fn next(&mut self) -> Option<Self::Item> {
         let mut buf = vec![];
         let mut limited_reader = self.source.by_ref().take(self.chunk_size as u64);
-        // TODO[LATER]: test behavior on perfectly and imperfectly chunked inputs
         match limited_reader.read_to_end(&mut buf) {
             Err(err) => Some(Err(err)),
             Ok(n) if n == self.chunk_size as usize => Some(Ok(buf)),
@@ -26,15 +33,6 @@ impl<R: Read> Iterator for Chunker<R> {
         }
     }
 }
-
-// pub fn signature(r: impl IntoIterator<Item = u8>) -> impl Iterator<Item =
-// TODO[LATER]: fn (?) -> impl Iterator<Item = BlockSignature>
-//   -> see e.g. "chunker" type idea: https://kevinhoffman.medium.com/creating-a-stream-chunking-iterator-in-rust-d4063ffd21ed
-// pub fn signature(r: impl Read) -> io::Result<Vec<BlockSignature>> {
-//     loop {
-
-//     }
-// }
 
 #[derive(Debug)]
 pub struct BlockSignature {
@@ -52,12 +50,6 @@ impl From<&[u8]> for BlockSignature {
         }
     }
 }
-
-// // TODO[LATER]: iterator of sized chunks of an io::Read impl
-// pub fn signature(r: impl io::Read) -> io::Result<Vec<SignatureEntry>> {
-// }
-
-// TODO: do we have to calc signature for the last smaller block too? sounds risky & tricky & not worth it
 
 // TODO: verify with rdiff
 // https://rsync.samba.org/tech_report/node3.html
