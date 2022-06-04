@@ -1,5 +1,40 @@
 use md4::{Digest, Md4};
+use std::io::{self, Read};
 use std::num::Wrapping;
+
+pub struct Chunker<R: Read> {
+    chunk_size: u16,
+    source: R,
+}
+
+impl<R: Read> Chunker<R> {
+    fn new(chunk_size: u16, source: R) -> Self {
+        Self { chunk_size, source }
+    }
+}
+
+impl<R: Read> Iterator for Chunker<R> {
+    type Item = io::Result<Vec<u8>>;
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut buf = vec![];
+        let mut limited_reader = self.source.by_ref().take(self.chunk_size as u64);
+        // TODO[LATER]: test behavior on perfectly and imperfectly chunked inputs
+        match limited_reader.read_to_end(&mut buf) {
+            Err(err) => Some(Err(err)),
+            Ok(n) if n == self.chunk_size as usize => Some(Ok(buf)),
+            Ok(_) => None,
+        }
+    }
+}
+
+// pub fn signature(r: impl IntoIterator<Item = u8>) -> impl Iterator<Item =
+// TODO[LATER]: fn (?) -> impl Iterator<Item = BlockSignature>
+//   -> see e.g. "chunker" type idea: https://kevinhoffman.medium.com/creating-a-stream-chunking-iterator-in-rust-d4063ffd21ed
+// pub fn signature(r: impl Read) -> io::Result<Vec<BlockSignature>> {
+//     loop {
+
+//     }
+// }
 
 #[derive(Debug)]
 pub struct BlockSignature {
@@ -64,9 +99,6 @@ impl WeakSum {
     }
 }
 
-// u16 << 16 | u16 ---> u32
-// b(k,l) << 16 | a(k,l)
-
 // // TODO: what type to return?
 // // TODO: doc
 // pub fn signature(data: impl io::Read) -> Vec<SignatureEntry> {
@@ -84,6 +116,21 @@ mod tests {
     fn test_weak_sum() {
         assert_eq!(WeakSum::from(&[1][..]).to_u32(), 0x00010001);
         assert_eq!(WeakSum::from(&[1, 2][..]).to_u32(), 0x00040003);
+    }
+
+    #[test]
+    fn test_chunker() {
+        let source = vec![1, 2, 3];
+
+        let chunks_len_2: Vec<_> = Chunker::new(2, &*source)
+            .map(|result| result.ok())
+            .collect();
+        assert_eq!(chunks_len_2, [Some(vec![1, 2])]);
+
+        let chunks_len_3: Vec<_> = Chunker::new(3, &*source)
+            .map(|result| result.ok())
+            .collect();
+        assert_eq!(chunks_len_3, [Some(vec![1, 2, 3])]);
     }
 
     /*
