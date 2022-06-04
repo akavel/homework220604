@@ -5,15 +5,17 @@ use std::num::Wrapping;
 use std::ops::Deref;
 
 // TODO[LATER]: make it a parameter
-const BLOCK_SIZE: u16 = 1024;
+const DEFAULT_BLOCK_SIZE: u16 = 1024;
 
-pub fn signature(r: impl Read) -> impl Iterator<Item = io::Result<BlockSignature>> {
+pub fn signature<const BLOCK_SIZE: u16>(
+    r: impl Read,
+) -> impl Iterator<Item = io::Result<BlockSignature>> {
     // TODO: do we have to calc signature for the last smaller block too? sounds risky & tricky & not worth it
     Chunker::new(BLOCK_SIZE, r)
         .map(|result| result.map(|block| BlockSignature::from(block.deref())))
 }
 
-pub fn diff<S, D>(signatures: S, data: D) -> io::Result<Vec<Command>>
+pub fn diff<S, D, const BLOCK_SIZE: u16>(signatures: S, data: D) -> io::Result<Vec<Command>>
 where
     S: Iterator<Item = BlockSignature>,
     D: Read,
@@ -36,21 +38,17 @@ where
         };
         // TODO[LATER]: enum for func state
         buf.push(byte);
-        const BLOCK_USIZE: usize = BLOCK_SIZE as usize;
-        const BLOCK_USIZE_MINUS_1: usize = BLOCK_USIZE - 1;
-        match buf.len() {
-            0..=BLOCK_USIZE_MINUS_1 => continue,
-            BLOCK_USIZE => {
-                weak_sum = Some(WeakSum::from(&*buf));
-            }
-            n @ _ => {
-                weak_sum
-                    .unwrap()
-                    .update(BLOCK_SIZE, buf[n - BLOCK_USIZE - 1], byte);
-            }
+        let buf_len = buf.len();
+        if buf_len < BLOCK_SIZE as usize {
+            continue;
+        } else if buf_len == BLOCK_SIZE as usize {
+            weak_sum = Some(WeakSum::from(&*buf));
+        } else {
+            let old_byte = buf[buf_len - BLOCK_SIZE as usize - 1];
+            weak_sum.unwrap().update(BLOCK_SIZE, old_byte, byte);
         }
         if let Some(block_info) = block_map.get(&weak_sum.unwrap()) {
-            let block_begin = buf.len() - BLOCK_USIZE;
+            let block_begin = buf.len() - BLOCK_SIZE as usize;
             let digest = Md4::digest(&buf[block_begin..]);
             if digest != block_info.digest {
                 continue;
